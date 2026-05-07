@@ -1,6 +1,7 @@
 {
   "name": "knowledge-base",
   "version": "1.0.0",
+  "type": "module",
   "description": "📚 个人知识库 - 每日学习记录与知识沉淀",
   "scripts": {
     "dev": "vitepress dev docs",
