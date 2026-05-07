@@ -21,3 +21,4 @@ npm run dev
 ## 部署
 
 Push 到 main 分支自动通过 GitHub Pages 部署。
+<!-- sync test -->
