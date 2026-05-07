@@ -18,7 +18,8 @@ export default defineConfig({
         {
           text: '📅 每日学习',
           items: [
-            { text: '索引', link: '/daily/' }
+            { text: '索引', link: '/daily/' },
+            { text: '2026-05-07 · TCE + qGPU', link: '/daily/2026-05-07' },
           ]
         }
       ],
@@ -43,6 +44,7 @@ export default defineConfig({
             { text: 'Pod', link: '/topics/k8s/pod/' },
             { text: 'PV/PVC', link: '/topics/k8s/pv-pvc/' },
             { text: 'Service', link: '/topics/k8s/service/' },
+            { text: 'GPU 工作负载', link: '/topics/k8s/gpu/' },
           ]
         }
       ]
