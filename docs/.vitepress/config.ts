@@ -28,6 +28,7 @@ export default defineConfig({
           items: [
             { text: '索引', link: '/daily/' },
             { text: '2026-05-07 · TCE + qGPU', link: '/daily/2026-05-07' },
+            { text: '2026-05-08 · qGPU Checkpoint 僵尸分配', link: '/daily/2026-05-08' },
           ]
         }
       ],
