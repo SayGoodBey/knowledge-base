@@ -260,6 +260,68 @@ spec:
 
 ---
 
+## qGPU Checkpoint 僵尸分配导致调度失败 <2026-05-08>
+
+**场景**：创建 GPU 整卡工作负载（`qgpu-core: 100`），Pod 一直 Pending，但 `nvidia-smi` 显示 GPU 物理层面完全空闲。
+
+**根因**：kubelet 的 device-plugin checkpoint 文件（`/var/lib/kubelet/device-plugins/kubelet_internal_checkpoint`）残留了已删除 Pod 的 GPU 分配记录，导致 qGPU 调度器误认为资源已被占用。
+
+**调度器报错示例**：
+```
+0/2 nodes are available:
+  1 failed to allocate (100, 0, 1) on (80, 11, 16)(90, 11, 16)
+  1 failed to allocate (100, 0, 1) on (90, 11, 16)(90, 11, 16)
+```
+格式：`(请求core, 请求memory, 卡数)` on `(已用core, 已用卡数, 总卡数)(...)`
+
+**排查路弄**：
+
+```bash
+# 1. 确认 Pod Pending
+kubectl describe pod <name> | grep -A 5 Events
+
+# 2. nvidia-smi 确认物理GPU空闲
+nvidia-smi
+
+# 3. 查看 checkpoint 文件（在节点上执行）
+cat /var/lib/kubelet/device-plugins/kubelet_internal_checkpoint
+# 看 PodDeviceEntries 中的 PodUID
+
+# 4. 验证这些 Pod 是否还存在
+kubectl get pods --all-namespaces --field-selector metadata.uid=<pod-uid>
+# 如果查不到 → 确认是僵尸分配
+```
+
+**解决方案**：
+
+```bash
+# 方案 1：重启 kubelet（推荐，会自动重建 checkpoint）
+systemctl restart kubelet
+
+# 方案 2：手动清理 checkpoint
+systemctl stop kubelet
+rm /var/lib/kubelet/device-plugins/kubelet_internal_checkpoint
+systemctl start kubelet
+
+# 方案 3：同时重启 qGPU plugin + kubelet
+docker ps | grep qgpu
+docker restart <qgpu-container-id>
+systemctl restart kubelet
+```
+
+**重启 kubelet 的影响**：
+- 节点上现有 Pod 短暂失联（10-30秒）
+- 容器进程不会被杀死
+- 如有重要业务，先 `kubectl cordon <node>` 禁止新调度，操作完后 `kubectl uncordon`
+
+**关键经验**：
+- qGPU 整卡请求（core=100）不能和共享 Pod 混在同一张 GPU 上
+- 物理空闲 ≠ 逻辑空闲，`nvidia-smi` 只反映物理状态，checkpoint 才是调度器的判断依据
+- Pod 被强制删除（如 `--force --grace-period=0`）后更容易出现 checkpoint 残留
+- YAML 中 `cpu: '0'` 和 `memory: '0'` 不合理，应设实际值
+
+---
+
 ## 关键结论速查
 
 1. **节点 `TAINTS: <none>` → 不用配 tolerations**
