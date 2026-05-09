@@ -103,3 +103,58 @@ const io = new Server(server, {
 **相关知识点**: [Next.js API Route 优先级](/topics/frontend/next/) · [puppeteer 内存模型](/topics/frontend/performance/)
 
 ---
+
+### 合并分支后前端白屏，终端只有 warning / Console 没有红字 2026-05-09
+
+**现象**: 从 `release/tce3.10.12` merge 到新分支后本地 `npm run dev` 启动，浏览器页面一直卡在 `<Status icon="loading" title="页面加载中..." />` fallback；服务端 `GET / 200`；终端只有 SCSS `@import` deprecation、`forwardRef`、`findDOMNode`、`ReactDOM.render` 几类 warning；Console 里也看不到红色 fatal error。无痕窗口同样复现。
+
+**误判路径**（耗时最长）:
+
+1. ❌ 怀疑 ServiceWorker / 浏览器缓存劫持 dev chunk → 清 site data + 无痕无效
+2. ❌ 怀疑 `@tencent/tea-component` 版本（`forwardRef`/`findDOMNode` warning 噪音）→ 锁回 `2.8.1-beta.14` 无效
+3. ❌ 怀疑 `next.config.js` 的 sassOptions 配置不全导致 SCSS 编译失败 → 补 `loadPaths`/`additionalData` 后 warning 消了，但白屏依旧
+4. ❌ 怀疑 Next.js 16 + Turbopack 的 CSS 严格模式 → 写 `fix-tea-component.js` postinstall 脚本补丁 `tea.css` 里的 `:first{...}` → 无效（且当前 server.js 强制走 webpack 根本不进 turbopack 解析器）
+5. ❌ 怀疑 `@antv/g6`/`react-pdf` 等 SSR 不友好的库 → chunk 51MB 没问题，Network 全部 200
+
+**真正的根因**:
+
+合并时 `src/types/` 目录下的 7 个子类型文件（`report.ts / setting.ts / task.ts / region.ts / power.ts / path.ts / host.ts`）被全部误删，同时 `src/types/index.ts` 里 `export * from './task'` 等 7 条 re-export 也被删掉。导致：
+
+```ts
+// src/modules/systemConfiguration/component/ClusterConfigTable/index.tsx
+import { UserRole } from '@client/types';   // 解析到 src/types/，拿到的是 undefined（UserRole 实际定义在 config/types.ts）
+const MANAGE_ROLE = [UserRole.Admin];       // ← TypeError: Cannot read 'Admin' of undefined
+```
+
+这个 `TypeError` 发生在 **chunk 模块顶层求值阶段**，触发在 `dynamic(() => import('../src'))` 的 Promise 链里。被 Next.js 的 `loadable.shared-runtime.js` 捕获后**静默吞掉只保持 loading 状态**，既不弹 dev overlay 也不走外层 error boundary，Console 表面上看不到任何红字。
+
+**定位手法**: 在 `pages/[[...slug]].tsx` 的两个 `dynamic()` 的 `loader` 上加 `.catch()` 主动打印 + 重抛：
+
+```tsx
+const DynamicComponentWithNoSSR = dynamic(
+  () =>
+    import('../src').catch((err) => {
+      console.error('[DynamicComponentWithNoSSR] Failed to load src chunk:', err);
+      throw err;  // 重抛以保持原流程
+    }),
+  { ssr: false, loading: () => <LoadingPage /> },
+);
+```
+
+加完后刷新页面，Console 里直接出现带自定义前缀的红字报错 + 完整调用栈，一眼看到 `ClusterConfigTable/index.tsx:17:31` 是出错点。
+
+**修复**:
+
+1. 从 `release/tce3.10.12` 恢复 7 个被误删的类型文件
+2. `src/types/index.ts` 补回 `export * from './xxx'` 的 re-export，并额外添加 `export { UserRole } from '@config/types'`（`UserRole` 实际定义在 `config/types.ts`，但业务代码都是从 `@client/types` 引用）
+
+**经验教训**:
+
+- **"Console 全是 warning 没有红字" ≠ "没有 fatal error"**：Next.js 16 pages router 对 dynamic import chunk 求值阶段抛出的 Promise rejection 有静默吞错的分支，不会弹 dev overlay。**碰到白屏 + LoadingPage 无限转 + 无红字，第一反应应该是给 dynamic import 手动挂 `.catch` 打印**
+- 同一个枚举不要在 `config/types.ts` 和 `src/types/` 两处都可能被 import：`UserRole` 定义在 `config/types.ts`，但大量业务模块写的是 `import { UserRole } from '@client/types'`，这类跨目录别名依赖 re-export 链路，一旦 re-export 丢失就是雪崩
+- 合并代码时，**`src/types/` 这种"聚合导出"类的 index 文件**最容易在解决冲突时把一边的 `export * from './xxx'` 误删，应该作为 merge review 的重点检查项
+- 排查顺序应该是**先给可疑的 dynamic import 加调试 `.catch` 暴露真实错误，再根据错误堆栈倒查**，而不是从环境层（版本、缓存、代理、CSS 配置）层层猜
+
+**相关知识点**: [Next.js dynamic() 静默吞错 & 强制暴露错误](/topics/frontend/next/)
+
+---

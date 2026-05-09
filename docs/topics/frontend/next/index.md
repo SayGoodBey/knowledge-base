@@ -55,3 +55,45 @@ const io = new Server(server, {
 - engine.io `attach` 选项：[https://socket.io/docs/v4/server-options/#destroyupgrade](https://socket.io/docs/v4/server-options/#destroyupgrade)
 
 ---
+
+## `next/dynamic` 静默吞掉模块顶层错误 2026-05-09
+
+**场景**: 使用 `dynamic(() => import('../src'), { ssr: false, loading: () => <LoadingPage /> })` 加载大模块。如果 `../src` 的某个**依赖模块在顶层代码求值时抛错**（例如 `const X = [UserRole.Admin]` 而 `UserRole` 是 undefined），页面会永久卡在 `loading` fallback：
+
+- 服务端 `GET / 200`
+- 终端只有 warning，没有 fatal
+- 浏览器 Console 看起来"全是黄色/红色 warning，没有真正红色 Error"
+- Next.js dev overlay 不弹红框
+- 没有任何 error boundary 被命中
+
+**原因**: Next.js 的 `next/dynamic` 底层用 `react-loadable` / `React.lazy`。当 `loader` 的 Promise 以"模块求值异常"的方式 reject 时，Next.js 的 `loadable.shared-runtime.js` 在某些开发模式分支会**把错误存到内部 state 里只继续 `loading`**，而不是触发 `error` 状态或重抛到 React render。外层如果没配 `dynamic({ ..., error: () => ... })` 或 error boundary，这个错误就彻底沉默。
+
+**强制暴露错误的手法**（排查利器）:
+
+```tsx
+const DynamicComponentWithNoSSR = dynamic(
+  () =>
+    import('../src').catch((err) => {
+      console.error('[DynamicComponentWithNoSSR] Failed to load src chunk:', err);
+      throw err;  // 重抛，不改变原有流程
+    }),
+  { ssr: false, loading: () => <LoadingPage /> },
+);
+```
+
+在 Promise 链的**最前**插入自己的 `.catch`，能保证：
+
+1. 一定会 `console.error` 一条带**可搜索前缀**的红字 + 完整堆栈
+2. `throw err` 重抛后下游 dynamic runtime 的行为不变（依然显示 loading）
+3. 零成本、零副作用，排查完可以选择性保留做兜底日志
+
+**要点**:
+
+- 白屏 + 无限 loading + Console 没有红字时，**先怀疑 dynamic import 静默吞错**，给每个 `dynamic()` 的 loader 挂 `.catch` 打印
+- 相比盲目排查环境（缓存/代理/版本/编译），直接暴露真实报错栈能省数小时
+- 生产环境也可以给关键 dynamic import 挂 `.catch` 发上报，比"用户反馈白屏"可观测强得多
+- 误区：`Console` 里那些 `Warning: findDOMNode is deprecated` / `Warning: ReactDOM.render is no longer supported` 图标虽红，但文本前缀是 `Warning:`，**都是非阻塞 warning**，不是白屏根因
+
+**相关案例**: [DRMS 合并分支后白屏排查](/topics/projects/drms/)
+
+---
