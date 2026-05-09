@@ -27,8 +27,9 @@ export default defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
-            { text: '2026-05-07 · TCE + qGPU', link: '/daily/2026-05-07' },
+            { text: '2026-05-09 · DRMS PDF 方案对比 & puppeteer 骨架', link: '/daily/2026-05-09' },
             { text: '2026-05-08 · qGPU 僵尸分配 & Next HMR 被 socket.io 误杀', link: '/daily/2026-05-08' },
+            { text: '2026-05-07 · TCE + qGPU', link: '/daily/2026-05-07' },
           ]
         }
       ],

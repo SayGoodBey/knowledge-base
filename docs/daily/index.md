@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-05-09](/daily/2026-05-09) —— DRMS 报告 PDF 导出三种方案对比 & puppeteer 骨架
 - [2026-05-08](/daily/2026-05-08) —— qGPU Checkpoint 僵尸分配 & Next HMR 被 socket.io 误杀
 - [2026-05-07](/daily/2026-05-07) —— TCE + qGPU 工作负载从 0 到跑通
 
