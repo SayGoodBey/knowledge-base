@@ -322,6 +322,95 @@ systemctl restart kubelet
 
 ---
 
+## qGPU 资源泄漏：调度失败但 nvidia-smi 空闲 <2026-05-11>
+
+**场景**：Pod Pending，`kubectl describe nodes` 显示 qGPU 资源已分配（qgpu-core: 30/200、qgpu-memory: 40/62），但 `nvidia-smi` 显示 GPU 完全空闲，无进程运行。重启 kubelet 和 qgpu-manager 都无效。
+
+**典型调度报错**：
+```
+Warning  FailedScheduling  48m  default-scheduler  0/2 nodes are available:
+  1 failed to allocate (100, 0, 1) on (80, 11, 16)(90, 11, 16)
+```
+
+**根因**：整卡 Pod 删除后，qGPU-device-plugin 元数据未同步释放，导致调度器认为资源被占用。物理 GPU 空闲但 K8s 逻辑资源被"幽灵分配"卡住。
+
+### 诊断流程
+
+```bash
+# Step 1: 确认 Pending 原因（Events）
+kubectl describe pod <pending-pod> -n <ns> | grep -A10 Events
+
+# Step 2: 节点 qGPU 分配（K8s 视角）
+kubectl describe nodes | grep -E "qgpu-core|qgpu-memory"
+# 结果: tke.cloud.tencent.com/qgpu-core    30    30  ← 有分配
+
+# Step 3: nvidia-smi（物理卡视角）
+nvidia-smi
+# 结果: 0 MiB, No running processes  ← 空闲
+
+# Step 4: 搜索谁在用 qGPU（所有命名空间）
+kubectl get pods -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,qgpu-core:.spec.containers[0].resources.limits.tke\.cloud\.tencent\.qgpu-core,qgpu-memory:.spec.containers[0].resources.limits.tke\.cloud\.tencent\.qgpu-memory | grep -v "<none>" | grep -v "qgpu-core"
+
+# Step 5: 找 Terminating 卡住的 Pod
+kubectl get pods -A | grep Terminating
+```
+
+### 根因定位对照
+
+| K8s 资源分配 | nvidia-smi | 说明 |
+|---|---|---|
+| 有分配（30/200） | GPU 空闲 | **资源泄漏（元数据残留）** |
+| 有分配 | 有进程在跑 | 真实占用，等资源释放 |
+| 无分配 | GPU 空闲 | 其他问题（污点/调度策略） |
+
+### 解决方案（按优先级）
+
+**方案 1：重启 qGPU DaemonSet（先试）**
+```bash
+# 重启 qgpu-manager（DaemonSet）
+kubectl delete pod -n qgpu -l app=qgpu-manager --field-selector spec.nodeName=<节点名>
+
+# 重启所有 qGPU DaemonSet
+kubectl rollout restart daemonset -n qgpu
+```
+
+**方案 2：重启 kubelet（方案 1 无效时）**
+```bash
+systemctl restart kubelet
+# 注意：节点上 Pod 短暂失联（10-30s），容器进程不会被杀
+```
+
+**方案 3：手动清理 device-plugin checkpoint（终极方案）**
+```bash
+systemctl stop kubelet
+rm -f /var/lib/kubelet/device-plugins/kubelet_internal_checkpoint
+systemctl start kubelet
+```
+
+**方案 4：绕过调度器直接指定节点（临时方案）**
+```bash
+# 加 nodeSelector 直接调度到指定节点
+kubectl patch deployment <name> -n <ns> -p '{
+  "spec": {
+    "template": {
+      "spec": {
+        "nodeSelector": {"kubernetes.io/hostname": "10.29.25.5"}
+      }
+    }
+  }
+}'
+```
+
+### 预防措施
+
+1. Pod 删除前确保优雅终止，给 qGPU 释放时间
+2. 避免强制 `kubectl delete --force`，使用 `kubectl delete --grace-period=30`
+3. 定期巡检 `kubectl get pods -A | grep Terminating`，及时清理卡住的 Pod
+4. qGPU-operator 版本建议 ≥ 3.0.2（修复了部分资源泄漏问题）
+5. 整卡 Pod（qgpu-core=100）删除后检查 `nvidia-smi` 和节点资源状态确认已释放
+
+---
+
 ## 关键结论速查
 
 1. **节点 `TAINTS: <none>` → 不用配 tolerations**
