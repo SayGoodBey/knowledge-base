@@ -50,7 +50,7 @@ const io = new Server(server, {
 
 | 方案 | 实现位置 | 致命问题 |
 |---|---|---|
-| ① pdfmake（当前线上） | `src/modules/report/hooks/useDownloadPdf/` + Web Worker | 大报告下 `generateDoc` 构建 `docDefinition` 对象能达数十 MB，主线程序列化阻塞 10s+；字体要额外嵌入（已做 `subset-fonts.js` 中文裁剪），体积仍大。排版靠手写 JSON，跟页面视觉完全脱节。 |
+| ① pdfmake（当前线上） | `src/modules/report/hooks/useDownloadPdf/` + Web Worker | 大报告下 `generateDoc` 构建 `docDefinition` 对象能达数十 MB，主线程序列化阻塞 10s+；字体要额外嵌入（已做 `subset-fonts.js` 中文裁剪），体积仍大。排版靠手写 JSON，跟页面视觉完全脱节。**⚠️ 2026-05-11 补充根因**：上面说的"卡 10s+"很大一部分其实**不是 pdfmake 慢**，而是 **pdfmake 升级后 `pdfDoc.getBlob()` API 变了**，详见下方「pdfmake 0.3.x getBlob API 变更」。 |
 | ② html2canvas + jsPDF | 备选 | **必须展开所有折叠 UI 才能截图**，而折叠是每个 `ReportSubTaskLogItem` 的 `useState(false)` 自管理，外部无法强控；即使能控，折叠展开后 DOM 高度动辄几万像素，html2canvas 单次 `canvas` 超限或内存爆掉。色彩与字体渲染在不同浏览器有差异。**本质是把屏幕截图拼成 PDF，不是真 PDF**（无文本层，不可检索、不可复制）。 |
 | ③ 服务端 Puppeteer（当前验证方向） | 新增 `pages/api/report/export-pdf.ts` | 生成的是真 PDF（有文本层、真 CSS 分页）；但 puppeteer 单实例峰值内存 300MB~1GB，**默认并发会把 server.js 直接 OOM 拖挂**，必须加并发队列 + 浏览器单例。 |
 
@@ -156,5 +156,63 @@ const DynamicComponentWithNoSSR = dynamic(
 - 排查顺序应该是**先给可疑的 dynamic import 加调试 `.catch` 暴露真实错误，再根据错误堆栈倒查**，而不是从环境层（版本、缓存、代理、CSS 配置）层层猜
 
 **相关知识点**: [Next.js dynamic() 静默吞错 & 强制暴露错误](/topics/frontend/next/)
+
+---
+
+### pdfmake 0.3.x getBlob API 变更：callback 失效导致 Worker 假死 2026-05-11
+
+**现象**: 之前一直以为「pdfmake 导出大报告卡 10s+」是 pdfmake 渲染慢 / `docDefinition` 对象太大，还专门为此调研了 puppeteer 方案。后来复查发现 worker 里 `pdfDoc.getBlob` 那步**根本没返回**——页面上「PDF 生成中...」转圈永远结束不了。
+
+**真因**: 当前用的是 `pdfmake@0.3.6`，而老代码从 `0.2.x` 时代沿用至今：
+
+```ts
+// src/modules/report/hooks/useDownloadPdf/download.worker.ts（旧）
+const pdfDoc = pdfMake.createPdf(doc);
+
+pdfDoc.getBlob((blob) => {        // ← 以为是回调
+  postMessage({ type: 'data', data: { blob, filename } });
+  postMessage({ type: 'end' });
+});
+```
+
+**pdfmake 0.3.x 起 `getBlob` 不再接受 callback**，改成返回 `Promise<Blob>`。把 callback 传进去 pdfmake **既不会调用它，也不会报错**，只是默默返回一个没人 `.then()` 的 Promise → `postMessage` 永远不触发 → Worker 假死 → 主线程只看到「一直在生成中」。
+
+**修复**（两种写法二选一）:
+
+```ts
+// ① Promise 链 + catch
+pdfDoc
+  .getBlob()
+  .then((blob) => {
+    postMessage({ type: 'data', data: { blob, filename } });
+    postMessage({ type: 'end' });
+  })
+  .catch((error) => {
+    console.error('[worker] Error generating PDF blob:', error);
+    postMessage({ type: 'error', message: error?.message });
+    postMessage({ type: 'end' });
+  });
+
+// ② async/await（外层已有 try/catch）
+const blob = await pdfDoc.getBlob();
+postMessage({ type: 'data', data: { blob, filename } });
+postMessage({ type: 'end' });
+```
+
+**排查路径（踩坑）**:
+
+1. ❌ 以为是 `docDefinition` 太大 → 试过精简内容、限制子任务数量，卡顿没消失
+2. ❌ 以为是字体嵌入拖慢 → 换裁剪后的 `SourceHanSansCN` 没效果
+3. ❌ 直接跳去做 puppeteer 方案（多花了 2 天）
+4. ✅ 某次 AI 代码评审（TAPD CR）直接指出「第 166-168 行代码中，`pdfDoc.getBlob().then(...)` 的 Promise 链未添加 catch 处理」——顺着这条才意识到**原代码连 `.then` 都没有**，根本就是 API 用法错了
+
+**经验教训**:
+
+- **升级第三方库时 callback → Promise 的 API 变更最隐蔽**：旧签名 `getBlob(callback)` 在新版本里变成 `getBlob(): Promise<Blob>`，callback 参数被静默忽略，不会抛错也不会在 console 里警告。写 TS 配合新版 `@types/pdfmake` 能第一时间暴露（callback 参数会飘红），**但老项目的 `.ts` 文件如果禁用了严格模式 / 没装对类型就会溜过去**
+- **"转圈永不结束"类 Worker 假死，优先怀疑的不是"慢"，而是某个 async 入口的 resolve 根本没进来**。排查手法：在 worker 里给 `getBlob` 的 callback 和紧跟的 `postMessage` 都打 log，看最后一行 log 停在哪
+- **AI CR 能发现这种"没加 catch"类 Promise 问题非常有价值**，比人工走读更容易看到；**但这次的教训是 AI CR 只报了「缺 catch」，没意识到代码其实还是旧 callback 风格 → 两个问题叠在一起**。下次升级类似有 API 演进的库（pdfmake、pdf-lib、docx、antd 大版本），Code Review 清单应该显式加一条「本次是否升级了这个库？升级后 API 签名是否变化？所有调用点都切过来了吗？」
+- **技术方案评估要先把现有方案的根因问题刨到底**，别在一个被 bug 伪装成「性能问题」的方案上盖新方案。如果提前发现 pdfmake 只是 API 用错了，puppeteer 方案应该作为"可选增强"而不是"刚性替代"
+
+**相关知识点**: [第三方库大版本升级的排查清单](/topics/frontend/performance/)
 
 ---

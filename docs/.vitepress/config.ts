@@ -27,6 +27,7 @@ export default defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-05-11 · pdfmake getBlob API 变更排查', link: '/daily/2026-05-11' },
             { text: '2026-05-09 · DRMS PDF 方案对比 & 合并分支后白屏排查', link: '/daily/2026-05-09' },
             { text: '2026-05-08 · qGPU 僵尸分配 & Next HMR 被 socket.io 误杀', link: '/daily/2026-05-08' },
             { text: '2026-05-07 · TCE + qGPU', link: '/daily/2026-05-07' },
