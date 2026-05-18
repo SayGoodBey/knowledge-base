@@ -16,6 +16,7 @@ export default defineConfig({
           { text: '🚀 项目', link: '/topics/projects/' },
           { text: '🔧 DevOps', link: '/topics/devops/' },
           { text: '☸️ K8s', link: '/topics/k8s/' },
+          { text: '☁️ 云原生', link: '/topics/cloud-native/' },
           { text: '🤖 AI', link: '/topics/ai/' },
         ]
       },
@@ -27,6 +28,7 @@ export default defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-05-18 · 云原生学习模块启动', link: '/daily/2026-05-18' },
             { text: '2026-05-11 · pdfmake getBlob API 变更排查', link: '/daily/2026-05-11' },
             { text: '2026-05-09 · DRMS PDF 方案对比 & 合并分支后白屏排查', link: '/daily/2026-05-09' },
             { text: '2026-05-08 · qGPU 僵尸分配 & Next HMR 被 socket.io 误杀', link: '/daily/2026-05-08' },
@@ -88,6 +90,22 @@ export default defineConfig({
             { text: 'PV/PVC', link: '/topics/k8s/pv-pvc/' },
             { text: 'Service', link: '/topics/k8s/service/' },
             { text: 'GPU 工作负载', link: '/topics/k8s/gpu/' },
+          ]
+        }
+      ],
+
+      '/topics/cloud-native/': [
+        {
+          text: '☁️ 云原生学习',
+          items: [
+            { text: '概览', link: '/topics/cloud-native/' },
+            { text: '概述与发展简史', link: '/topics/cloud-native/overview' },
+            { text: 'CNCF 全景图', link: '/topics/cloud-native/landscape' },
+            { text: '容器技术', link: '/topics/cloud-native/container' },
+            { text: 'K8s 进阶', link: '/topics/cloud-native/k8s-advanced' },
+            { text: '服务网格', link: '/topics/cloud-native/service-mesh' },
+            { text: '可观测性', link: '/topics/cloud-native/observability' },
+            { text: 'CI/CD 与 GitOps', link: '/topics/cloud-native/gitops' },
           ]
         }
       ],

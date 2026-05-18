@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-05-18](/daily/2026-05-18) —— 云原生学习模块启动：概述、发展简史、CNCF 全景图
 - [2026-05-11](/daily/2026-05-11) —— pdfmake 卡顿的真凶：0.3.x getBlob API 从 callback 改 Promise
 - [2026-05-09](/daily/2026-05-09) —— DRMS 报告 PDF 导出 & 合并分支后白屏排查（dynamic import 静默吞错）
 - [2026-05-08](/daily/2026-05-08) —— qGPU Checkpoint 僵尸分配 & Next HMR 被 socket.io 误杀
