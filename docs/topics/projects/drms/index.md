@@ -216,3 +216,105 @@ postMessage({ type: 'end' });
 **相关知识点**: [第三方库大版本升级的排查清单](/topics/frontend/performance/)
 
 ---
+
+### Next.js 16 升级后 build 阶段 RangeError：barrel re-export 触发模块加载链爆栈 2026-05-21
+
+**现象**: `package.json` 把 Next 从 `15.5.16` 升到 `^16.2.1` 后，`npm run build`（webpack 模式）在 "Collecting page data" 阶段报：
+
+```
+unhandledRejection RangeError: Maximum call stack size exceeded
+    at ignore-listed frames {
+  type: 'RangeError'
+}
+```
+
+或者更明确的：
+
+```
+Build error occurred
+Error: Failed to collect page data for /[[...slug]]
+    at ignore-listed frames
+```
+
+栈帧被 Next 标记为 `ignore-listed frames` **完全隐藏**，原始日志看不到任何业务调用栈、文件名、行号。
+
+**误判路径**（耗了大半天）:
+
+1. ❌ 怀疑 Node 版本（猜是 18）→ 实测 Node 20.20.2 一样炸
+2. ❌ 在 `next.config.js` 顶层注册 `process.on('unhandledRejection')` 想抢在 Next handler 之前打印完整栈 → 失效，Next 内部 handler 已经先把栈过滤掉了
+3. ❌ 配 `experimental.cpus: 1` + `workerThreads: false` 单进程化 → 仍然炸（说明跟 worker 无关，纯模块加载问题）
+4. ❌ 配 `webpack(config)` 钩子关掉 `usedExports / providedExports / sideEffects / concatenateModules` → 无效（说明不是树摇优化的递归，是运行时 require 真的递归）
+
+**真正的二分定位手法**:
+
+`ignore-listed frames` 屏蔽栈帧的情况下，**唯一可靠的定位方法是「替换页面骨架做二分」**：
+
+1. 把 `pages/*.tsx` / `pages/api/*` 全部替换成最小骨架（`<div>min</div>` / 返回 `{ ok: true }`）→ build 通过 ✅
+2. 逐一恢复页面，定位到 `pages/_document.tsx` 一恢复就炸
+3. 在 `_document.tsx` 内部继续二分 imports，最终精确到一对组合：**只引 `@config` 不炸 + 只引 `@lib` 不炸 + 同时引就炸**
+4. 沿 `@lib` barrel 链路向下挖：`@lib → ./csrf → ./middleware → csrf.ts → '../../log4js'`，命中
+
+**根因**:
+
+`lib/log4js/index.ts` 在模块顶层立即执行：
+
+```ts
+import log4js from 'log4js';
+
+log4js.configure({
+  appenders: {
+    console: { type: 'console' },
+    file: { type: 'dateFile', filename: '...', ... },  // ⚠️ dateFile appender
+  },
+  ...
+});
+```
+
+而 `lib/index.ts`（`@lib` barrel）顶层 `export * from './log4js'`，且 `lib/csrf/middleware/csrf.ts` 顶层 `import { logger } from '../../log4js'`。这条链路被 `pages/_document.tsx` 通过 `@lib` 引用一次拉起 → Next 16 page-data 收集 worker 同步加载整条 ESM 链 → 触发模块加载器递归 → RangeError。
+
+Next 15 这套链路没问题；Next 16 webpack 模式下 page-data 收集对**「barrel re-export + 顶层副作用 + 间接加载副作用模块」**的容忍度大幅下降。
+
+**修复**（4 处，纯加载链路重构，零业务逻辑变更）:
+
+1. `lib/index.ts` 注释掉两条 re-export（不再让 barrel 把这些副作用模块拉进来）：
+   ```ts
+   // export * from './grpc/client';
+   // export * from './log4js';
+   ```
+   保留 csrf 三件套（`createToken / csrfOptions / csrfToken`）的导出，因为它们没有副作用且 `_document.tsx` 需要。
+
+2. `lib/csrf/middleware/csrf.ts` 把 `import { logger } from '../../log4js'` 改成函数内 lazy require：
+   ```ts
+   const getLogger = () => require('../../log4js').logger;
+   // 使用处：getLogger().catch(...)
+   ```
+   这是**核心修复点**——验证过：改回顶层 import 立即重现 RangeError。
+
+3. `lib/grpc/client.ts` 同样把 `import { logger } from '..'` 改成 lazy require `'../log4js'`（被 socket api 路由直接 import 时，避免顶层加载链触达 log4js）。
+
+4. `pages/[[...slug]].tsx` 把 `import { logger } from '@lib'` 改成 lazy require `@lib/log4js`（页面参与 page-data 收集，跟 `lib/csrf` 同属"会被 page-data 加载"的一类）。
+
+5. 所有原本通过 `@lib` 取 `logger / taskClient / TaskClientProps` 的代码，全部切到子路径直接 import：
+   ```ts
+   import { logger } from '@lib/log4js';
+   import { taskClient, TaskClientProps } from '@lib/grpc/client';
+   import { csrf } from '@lib';   // csrf 仍走 barrel，无副作用
+   ```
+
+**经验教训**:
+
+- **Next 16 webpack 模式 + 大量 barrel re-export + 含副作用的子模块** = 极易触发 page-data 收集阶段的模块加载器递归。`ignore-listed frames` 让常规手段（栈、debugger、process hook）全都看不到任何信息
+- `ignore-listed frames` 屏蔽栈帧时，**最可靠的定位方法是手工二分**：先把所有 page 替换成最小骨架，再二分恢复，再二分 imports，再二分 barrel 链路。比折腾环境配置（cpus、workerThreads、webpack optimization）高效得多
+- **打破 barrel 互引环 / barrel 顶层副作用**有两类成熟手法，可组合使用：
+  - 把 barrel 入口的 `export * from './foo'` 换成具体子路径直接 import（顺手清理无副作用 barrel 转发）
+  - 把模块顶层的副作用 import 改成函数内 lazy require（彻底切断顶层加载链）
+- **lazy require 是真正的"切断"**，比"调整 barrel 顺序"或"加 sideEffects: false"更彻底——前者改的是模块加载图本身，后者只是优化层面的提示
+- **同一类问题在不同位置的修复策略要分类对待**：
+  - `lib/` 内会被 page-data worker 间接加载的工具模块 → 必须 lazy require
+  - `pages/api/*` 不参与 page-data 收集 → 顶层 import 完全安全
+  - `pages/*.tsx` 参与 page-data 收集 → lazy require 更稳妥
+- 升级 Next 大版本（15→16）时，**barrel 互引环 / 顶层副作用 / commonjs 互操作** 是高风险检查项；写一个简单的 `madge --circular` / 自检脚本可以提前暴露大部分隐患
+
+**相关知识点**: [Next.js 16 page-data 收集 & barrel 副作用](/topics/frontend/next/) · [Next.js dynamic() 静默吞错（同样属于 ignore-listed frames 类问题）](/topics/frontend/next/)
+
+---

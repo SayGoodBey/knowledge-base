@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-05-21](/daily/2026-05-21) —— Next 16 升级后 build 阶段 RangeError：barrel re-export 触发模块加载链爆栈
 - [2026-05-19](/daily/2026-05-19) —— 容器进阶 + K8s 核心架构与资源对象
 - [2026-05-18](/daily/2026-05-18) —— 云原生学习模块启动：概述、发展简史、CNCF 全景图
 - [2026-05-11](/daily/2026-05-11) —— pdfmake 卡顿的真凶：0.3.x getBlob API 从 callback 改 Promise

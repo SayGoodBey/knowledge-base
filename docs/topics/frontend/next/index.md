@@ -97,3 +97,93 @@ const DynamicComponentWithNoSSR = dynamic(
 **相关案例**: [DRMS 合并分支后白屏排查](/topics/projects/drms/)
 
 ---
+
+## Next.js 16 build 阶段 RangeError：barrel re-export 触发模块加载链爆栈 2026-05-21
+
+**场景**: Next 15 → Next 16（webpack 模式）升级后，`next build` 在 "Collecting page data" 阶段抛出：
+
+```
+unhandledRejection RangeError: Maximum call stack size exceeded
+    at ignore-listed frames
+```
+
+栈帧被 Next 标为 `ignore-listed frames` 完全隐藏，无法看到出错文件 / 行号 / 业务调用栈。
+
+**根因模型**:
+
+Next 16 在 webpack 模式下，"Collecting page data" 阶段会用 worker 进程同步加载每个页面模块及其全部顶层依赖。当出现以下组合时，模块加载器会陷入递归：
+
+1. **barrel 入口（如 `lib/index.ts`）通过 `export * from './foo'` 重导出多个子模块**
+2. **其中某个子模块顶层有副作用代码**（如 `log4js.configure({ ... })`、protobuf `task_pb` / `task_grpc_pb` 模块顶层 require）
+3. **该副作用模块又被 barrel 内的其他子模块通过具体路径顶层 import**（例如 `lib/csrf/middleware/csrf.ts` 顶层 `import { logger } from '../../log4js'`）
+
+形成「barrel 入口 → 副作用模块 + barrel 入口 → 中间模块 → 副作用模块」的菱形加载图，叠加 commonjs 互操作的 `__esModule` 包装，触发模块加载器递归 → RangeError。
+
+Next 15 这种情况通常被 module cache 自然化解，Next 16 page-data 收集对此宽容度大幅下降。
+
+**`ignore-listed frames` 下的定位手法**:
+
+常规手段失效（process hook 抢不过 Next、debugger 触发不到、source map 屏蔽），**唯一可靠的方法是手工二分**：
+
+```
+Step 1: 全部 page 替换成最小骨架（<div>min</div> / 空 handler）→ 期望 build 通过
+Step 2: 逐一恢复 page，定位到 N 个炸点 page
+Step 3: 在炸点 page 内部二分 imports（一半留一半删）
+Step 4: 锁定到一对组合"只引 A 不炸 + 只引 B 不炸 + 同时引炸"
+Step 5: 沿 barrel 链路向下挖，直到命中某条具体 import
+```
+
+辅助手法（最常见的具体怀疑路径）：
+
+- 把所有 `lib/*/index.ts` 风格的 barrel 入口 `cat` 出来，看哪个 `export *` 转发了**带顶层副作用**的模块
+- 重点怀疑：`log4js.configure` / `winston` 类日志库初始化、`grpc` proto 加载、`socket.io` 客户端 / 服务端初始化、`@grpc/grpc-js` 配合 `proto-loader`、各类自动注册路由 / 中间件的 SDK
+
+**修复手法（按推荐顺序）**:
+
+1. **从 barrel 入口移除带副作用的子模块 re-export**（最干净）：
+   ```ts
+   // lib/index.ts
+   // export * from './log4js';        ← 注释
+   // export * from './grpc/client';   ← 注释
+   ```
+   所有调用方改成走子路径直接 import：
+   ```ts
+   import { logger } from '@lib/log4js';
+   import { taskClient } from '@lib/grpc/client';
+   ```
+   barrel 仍然导出无副作用的内容（如 React 组件、纯函数、常量）。
+
+2. **被多处间接加载的"中间桥接模块"，把对副作用模块的顶层 import 改成函数内 lazy require**：
+   ```ts
+   // 不要：import { logger } from '../../log4js';
+   const getLogger = () => require('../../log4js').logger;
+   // 使用处：getLogger().catch(...)
+   ```
+   这是真正"切断"顶层加载链的唯一方法。`sideEffects: false`、`webpack.optimization` 调参都不能解决，因为问题在 ESM/CJS 模块加载器层面而不是树摇优化层面。
+
+3. **页面文件（`pages/*.tsx`）里 import 副作用模块时，倾向于 lazy require**：页面本身参与 page-data 收集，跟 barrel 内中间模块同属"会被 page-data 加载"的一类，统一防御更稳。
+
+4. **API 路由（`pages/api/*`）不参与 page-data 收集**，顶层 import 完全安全，不需要 lazy 化（用 lazy 反而损害可读性）。
+
+**模块按"是否被 page-data worker 同步加载"分类的修复策略**:
+
+| 模块类型 | 是否被 page-data 加载 | 顶层 import 副作用模块 |
+|---|---|---|
+| `pages/*.tsx`（页面） | ✅ 是 | ❌ 不要 → 用 lazy require |
+| `pages/api/*` | ❌ 否 | ✅ 安全 |
+| `pages/_document.tsx` / `pages/_app.tsx` | ✅ 是 | ❌ 不要 |
+| 被页面通过 barrel/直接路径间接引用的工具模块（`lib/*`） | ✅ 间接是 | ❌ 不要 → 用 lazy require |
+| 被 API 路由直接 import 的工具模块 | ❌ 否 | ✅ 安全 |
+
+**经验教训**:
+
+- 升级 Next 大版本（15→16）时，**barrel 互引环 / 顶层副作用 / commonjs 互操作** 是高风险检查项，可在升级前先跑一遍 `madge --circular src/ lib/` 暴露循环
+- `ignore-listed frames` 屏蔽栈帧的情况下，**手工二分比折腾环境配置高效得多**，不要把时间花在 `experimental.cpus`、`workerThreads`、`webpack.optimization` 调参上
+- **`sideEffects: false` 不能修这类问题**——它是树摇优化的提示，作用于 webpack ModuleGraph 静态分析；而模块加载递归发生在运行时 require/import，跟优化标志无关
+- "barrel 转发副作用模块"是个反模式，应该从代码规范层面避免。barrel 入口应只转发**纯定义模块**（类型、组件、常量、纯函数），副作用初始化应走专用 entry 或 lazy 化
+- 修复后保留**清晰的注释**：`lib/index.ts` 头部注释要说明为什么不再 re-export，否则下次有人加 `export * from './log4js'` 又会复发
+- 跨文件风格不必强求统一——比如 `lib/csrf/middleware/csrf.ts`（被 page-data 加载）必须 lazy require，但 `pages/api/[...slug].ts`（不参与 page-data）可以顶层 import，这种"按位置分类"的不一致是合理的
+
+**相关案例**: [DRMS Next 16 升级 build 失败排查（含完整二分过程）](/topics/projects/drms/)
+
+---

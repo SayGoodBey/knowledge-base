@@ -28,6 +28,7 @@ export default defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-05-21 · Next 16 升级 build RangeError 排查', link: '/daily/2026-05-21' },
             { text: '2026-05-19 · 容器进阶 + K8s 核心概念', link: '/daily/2026-05-19' },
             { text: '2026-05-18 · 云原生学习模块启动', link: '/daily/2026-05-18' },
             { text: '2026-05-11 · pdfmake getBlob API 变更排查', link: '/daily/2026-05-11' },
