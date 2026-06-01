@@ -28,6 +28,7 @@ export default defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-06-01 · cbc -p slash 命令真值 & v0.3.1 方案 E', link: '/daily/2026-06-01' },
             { text: '2026-05-25 · 新机器搭建知识沉淀环境 & Skill 安装规范', link: '/daily/2026-05-25' },
             { text: '2026-05-21 · Next 16 升级 build RangeError 排查', link: '/daily/2026-05-21' },
             { text: '2026-05-19 · 容器进阶 + K8s 核心概念', link: '/daily/2026-05-19' },
