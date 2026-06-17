@@ -216,7 +216,7 @@ docker run -d --restart always busybox top
 ### Live Restore
 
 - dockerd 重启/升级时，已运行容器**不会停止**
-- 检查方式：`docker info | grep 'Live Restore Enabled'` 或 `docker info -f '{{.LiveRestoreEnabled}}'`
+- 检查方式：`docker info | grep 'Live Restore Enabled'` 或 <span v-pre>`docker info -f '{{.LiveRestoreEnabled}}'`</span>
 - 配置：`/etc/docker/daemon.json` 中 `"live-restore": true`
 
 ### 容器引擎架构（解耦设计）
