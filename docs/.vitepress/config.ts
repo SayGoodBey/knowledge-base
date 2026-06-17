@@ -144,4 +144,4 @@ export default withMermaid(defineConfig({
       message: '持续学习，每天进步 🚀',
     }
   }
-})
+}))
