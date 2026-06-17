@@ -1,59 +1,52 @@
 # Pod
 
-记录 Pod 生命周期、Init Container、Sidecar、资源限制等知识。
+记录 Pod 生命周期、容器共享机制、Sidecar 模式等知识。
 
 ## 知识点
 
-## Pod 未就绪的三板斧诊断 <2026-05-07>
+## 核心概念 <2026-06-17>
 
-**场景**：在 TCE 控制台创建工作负载，状态显示「未就绪 0/2」，两个副本都没拉起来。
+**场景**：系统性学习 Pod 作为 K8s 最小调度单元的设计理念。
 
-**要点**：
+Pod 是**容器的「机箱」**——把一组紧密协作的容器装在一起，给它们共享的网络和存储。
 
-```bash
-# ① 一眼看全集群异常 Pod
-kubectl get po -A | grep -vE "Running|Completed"
-
-# ② 看具体 Pod 状态（READY、STATUS、NODE）
-kubectl get pods -n <ns> -l app=<name> -o wide
-
-# ③ 看 Pod 详细事件（最关键，90% 问题在这里）
-kubectl describe pod -n <ns> -l app=<name> | tail -50
+```mermaid
+flowchart TB
+    subgraph Pod["Pod（IP: 172.17.0.2）"]
+        subgraph Net["共享网络命名空间<br/>localhost 互通 · 共用端口空间"]
+            C1["主容器<br/>Nginx :80<br/>1 CPU · 1GB"]
+            C2["Sidecar<br/>Log Agent<br/>0.1 CPU · 0.5GB"]
+        end
+        V["Volume: /var/log/nginx<br/>主容器写日志 → Sidecar 读日志"]
+    end
+    C1 --> V
+    C2 --> V
 ```
 
-**常见 STATUS 对照表**：
+**三个关键点**：
 
-| STATUS | 排查方向 |
-|---|---|
-| `Pending` | 资源不足 / 调度规则 |
-| `ContainerCreating` 卡死 | 镜像/卷问题 |
-| `ImagePullBackOff` | 镜像名、私服认证、网络 |
-| `CrashLoopBackOff` | `kubectl logs --previous` |
-| `Running` 但 `READY=0/1` | 探针失败 |
-| `OOMKilled` | 调大 limits.memory |
+1. **IP 是 Pod 级别的，不是容器的**：Pod 内所有容器共用同一个 IP，用 `localhost` 通信。一个 Pod 内不能两个容器抢同一个端口。
 
-**Deployment → ReplicaSet → Pod → Container** 由上至下逐层钻取，事件区 `Events:` 的 Warning 直接给答案。
+2. **Volume 是共享的**：主容器写日志到 Volume，Sidecar 直接读——不走网络、不走内存拷贝，文件就是通信媒介。
 
-详见 [GPU 工作负载](../gpu/) 里的完整 TCE + qGPU 排障案例。
+3. **同生同死、一起调度**：调度器把 Pod 作为整体分配，不会被拆散到不同节点。重启时一起重建，不适合放独立服务。
 
-## Pod 核心概念 <2026-06-17>
-
-**场景**：系统性学习 Kubernetes Pod 的核心设计理念。
-
-**Pod = 容器的「机箱」**：最小调度单元，包含一个或多个紧密协作的容器。
-
-**共享机制**：
-- **网络**：Pod 级别的 IP（不是容器级别），同一 Pod 内容器共享 IP，`localhost` 即可通信。不能两个容器抢同一个端口
-- **Volume**：同一 Pod 内所有容器共享 Volume 挂载点
-- **生命周期**：同生同死，一起调度、一起销毁
-
-**Sidecar 模式**：主容器写日志到 `/var/log` → Sidecar 容器读同一个 Volume → 转发到日志中心。不需要走网络、不走内存拷贝。
-
-**与 Deployment 的关系**：Deployment → ReplicaSet → Pod。Deployment 管版本，ReplicaSet 管数量，Pod 跑容器。
+**常见 Sidecar 模式**：日志采集（Filebeat）、服务注册（Consul Agent）、代理转发（Envoy）
 
 ---
 
-**与之前知识的关联**：Pod 未就绪排查案例中的 `kubectl describe pod` 就是查看这个最小单元的内部状态。理解 Pod 是网络 + 存储的共享容器组，才能理解为什么"不同容器看到的日志文件是同一份"。
+## 调度器工作原理 <2026-06-17>
 
----
+**场景**：理解 Scheduler 如何为 Pod 选择最优节点（不只是「找空闲机器」）。
 
+```mermaid
+flowchart LR
+    A["待调度 Pod<br/>需要 2 CPU · 4GB"] --> B["过滤阶段<br/>排除不符合要求的节点"]
+    B --> C["打分阶段<br/>在候选节点中选最优"]
+    C --> D["节点 B ✓<br/>综合分数最高"]
+
+    B -.- B1["资源不足 · 节点污点<br/>端口冲突 · 选择器不匹配"]
+    C -.- C1["资源均衡度 · Pod 亲和性<br/>数据本地性 · 节点亲和性"]
+```
+
+**调度不是「谁空就放谁」**，而是先排除不合要求的（不足资源、有 Taint），再在候选节点中打分（资源均衡、数据就近、亲和匹配），选出最优。

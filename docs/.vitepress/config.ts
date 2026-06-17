@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 
-export default defineConfig({
+export default withMermaid(defineConfig({
   title: 'Knowledge Base',
   description: '📚 每日学习记录与知识沉淀',
   base: '/knowledge-base/',

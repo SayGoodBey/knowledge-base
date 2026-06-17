@@ -1,52 +1,76 @@
-# K8s API 基础
+# API 基础
 
-记录 Kubernetes API 设计、Label/Selector、Namespace、YAML 结构等知识。
+记录 K8s API 设计、Label / Selector 机制、Namespace 隔离等基础知识。
 
 ## 知识点
 
-## API 设计基础 <2026-06-17>
+## API 设计 <2026-06-17>
 
-**场景**：学习 K8s API 的基本形式，理解所有资源的统一结构。
+**场景**：学习 K8s RESTful API 的统一设计模式。
 
-**访问方式**：
-- `kubectl` 命令行工具
-- Dashboard Web UI
-- 直接用 `curl` 调 REST API
+**三种访问方式**：kubectl / Dashboard UI / 直接 curl API Server，底层都是 HTTP 请求。
 
-**REST URL 格式**：`/api/v1/namespaces/{ns}/pods/{name}`
+**URL 格式**：`/api/v1/namespaces/{ns}/pods/{name}`
 
-**YAML 四字段结构**（所有资源通用）：
+**所有资源统一的 YAML 四字段结构**：
 
-| 字段 | 含义 | 示例 |
+| 字段 | 作用 | 示例 |
 |------|------|------|
 | `apiVersion` | API 版本 | `v1`, `apps/v1`, `networking.k8s.io/v1` |
 | `kind` | 资源类型 | `Pod`, `Service`, `Deployment` |
 | `metadata` | 元数据 | `name`, `labels`, `namespace` |
-| `spec` | 规格定义 | `containers`, `replicas`, `selector` |
+| `spec` | 规格定义 | `containers`, `replicas` |
 
 ---
 
-## Label 和 Selector <2026-06-17>
+## Label 与 Selector <2026-06-17>
 
-**场景**：理解 K8s 松耦合关联的核心机制——Label 粘贴 + Selector 筛选。
+**场景**：K8s 的松耦合核心机制——资源不靠硬编码关联，全凭 Label 匹配。
 
-**Label**：给资源贴 Key-Value 标签（`app: nginx`, `env: prod`, `version: v1.2.3`）
+```mermaid
+flowchart LR
+    subgraph Pods["Pod 集群"]
+        A["Pod: apple<br/>labels: { color: red, app: frontend }"]
+        B["Pod: banana<br/>labels: { color: yellow, app: frontend }"]
+        C["Pod: strawberry<br/>labels: { color: red, app: backend }"]
+    end
 
-**Selector**：按标签筛选资源（`color=red` → 筛出 apple 和 strawberry，筛不掉 banana）
+    S["Selector: color=red"] --> A
+    S --> C
+    B -.-X S
+```
 
-**核心价值**：资源之间不靠硬编码的名字或 IP 关联，全凭 Label 匹配。Service 用 `app=nginx` 找到 Pod，Deployment 用 Label 找到 ReplicaSet——被找的不知道谁在找它，只管贴标签。
+**典型用法**：
+- Service 用 `app=nginx` 找到对应的 Pod
+- Deployment 用相同的 Label 管理自己的 ReplicaSet
+- `kubectl get pods -l env=prod` 筛选 prod 环境的所有 Pod
+
+**常用 Label**：`app`, `tier`, `env`, `version`, `component`
 
 ---
 
 ## Namespace <2026-06-17>
 
-**场景**：理解 Namespace 作为逻辑隔离单元的作用。
+**场景**：同一集群内划分逻辑租户，用于环境隔离、资源配额、权限管控。
 
-**三大价值**：
-- **环境隔离**：dev / staging / prod 不同 Namespace，各自配置互不干扰
-- **资源配额**：dev 只能吃 10 核 20G，prod 配 50 核 100G——防止单环境吃空集群
-- **权限隔离**：RBAC 让 dev 团队只能操作 dev Namespace
+```mermaid
+flowchart TB
+    subgraph Cluster["K8s 集群"]
+        subgraph Dev["Namespace: dev<br/>配额: CPU 10核, 内存 20GB<br/>权限: 开发人员可读写"]
+            D1["Pod: nginx"]
+            D2["Service: web"]
+            D3["ConfigMap: cfg"]
+        end
+        subgraph Prod["Namespace: prod<br/>配额: CPU 50核, 内存 100GB<br/>权限: 运维人员可操作"]
+            P1["Pod: nginx"]
+            P2["Service: web"]
+            P3["ConfigMap: cfg"]
+        end
+    end
+```
 
-**核心规则**：同 Namespace 内资源名唯一，不同 Namespace 可重名。
-
----
+**核心规则**：
+1. 同一 Namespace 内资源名唯一
+2. 不同 Namespace 可重名（dev 和 prod 都有 nginx）
+3. 跨 Namespace 访问需显式指定：`nginx.dev.svc.cluster.local`
+4. RBAC 可限制用户只能操作特定 Namespace
