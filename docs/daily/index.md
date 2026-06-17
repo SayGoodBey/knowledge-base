@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-06-17](/daily/2026-06-17) —— K8s 11 个核心概念系统学习：架构、Pod、Deployment、Service、Volume、API、Label/Selector、Namespace
 - [2026-06-01](/daily/2026-06-01) —— cbc -p 模式调用项目级 slash command 真值 & v0.3.1 方案 E
 - [2026-05-25](/daily/2026-05-25) —— 新机器搭建知识沉淀环境 & Skill 安装规范（占位符路径）
 - [2026-05-21](/daily/2026-05-21) —— Next 16 升级后 build 阶段 RangeError：barrel re-export 触发模块加载链爆栈

@@ -28,6 +28,7 @@ export default defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-06-17 · K8s 11个核心概念系统学习', link: '/daily/2026-06-17' },
             { text: '2026-06-01 · cbc -p slash 命令真值 & v0.3.1 方案 E', link: '/daily/2026-06-01' },
             { text: '2026-05-25 · 新机器搭建知识沉淀环境 & Skill 安装规范', link: '/daily/2026-05-25' },
             { text: '2026-05-21 · Next 16 升级 build RangeError 排查', link: '/daily/2026-05-21' },
@@ -88,6 +89,8 @@ export default defineConfig({
           text: '☸️ Kubernetes',
           items: [
             { text: '概览', link: '/topics/k8s/' },
+            { text: '架构', link: '/topics/k8s/architecture/' },
+            { text: 'API 基础', link: '/topics/k8s/api/' },
             { text: 'Node', link: '/topics/k8s/node/' },
             { text: 'Deployment', link: '/topics/k8s/deployment/' },
             { text: 'Pod', link: '/topics/k8s/pod/' },
