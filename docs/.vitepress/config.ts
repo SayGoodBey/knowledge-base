@@ -29,6 +29,7 @@ export default withMermaid(defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-08-08 · Vector RAG 原理', link: '/daily/2026-08-08' },
             { text: '2026-06-17 · K8s 11个核心概念系统学习', link: '/daily/2026-06-17' },
             { text: '2026-06-01 · cbc -p slash 命令真值 & v0.3.1 方案 E', link: '/daily/2026-06-01' },
             { text: '2026-05-25 · 新机器搭建知识沉淀环境 & Skill 安装规范', link: '/daily/2026-05-25' },
@@ -127,6 +128,7 @@ export default withMermaid(defineConfig({
             { text: '工作流', link: '/topics/ai/workflow/' },
             { text: 'MCP', link: '/topics/ai/mcp/' },
             { text: 'Skill', link: '/topics/ai/skill/' },
+            { text: 'RAG', link: '/topics/ai/rag/' },
           ]
         }
       ],

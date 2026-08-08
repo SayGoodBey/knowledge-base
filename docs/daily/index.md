@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-08-08](/daily/2026-08-08) —— Vector RAG 核心原理解析：Embedding、余弦相似度、归一化优化、GraphRAG vs Vector RAG
 - [2026-06-17](/daily/2026-06-17) —— K8s 11 个核心概念系统学习：架构、Pod、Deployment、Service、Volume、API、Label/Selector、Namespace
 - [2026-06-01](/daily/2026-06-01) —— cbc -p 模式调用项目级 slash command 真值 & v0.3.1 方案 E
 - [2026-05-25](/daily/2026-05-25) —— 新机器搭建知识沉淀环境 & Skill 安装规范（占位符路径）
