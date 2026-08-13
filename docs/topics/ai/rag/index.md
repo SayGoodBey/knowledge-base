@@ -135,3 +135,9 @@ class VectorRAG:
 ---
 
 > Vector RAG 的核心是"语义相似的文本在向量空间里挨得近"，然后用余弦相似度量化"挨得多近"。
+
+---
+
+## 相关
+
+- [Leiden 社区检测算法（GraphRAG 核心）](./graphrag-leiden) —— local move / refinement / aggregation 三阶段 + 模块度增量公式

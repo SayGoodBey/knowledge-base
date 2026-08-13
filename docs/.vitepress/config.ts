@@ -29,6 +29,7 @@ export default withMermaid(defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-08-13 · GraphRAG Leiden 社区检测算法', link: '/daily/2026-08-13' },
             { text: '2026-08-08 · Vector RAG 原理', link: '/daily/2026-08-08' },
             { text: '2026-06-17 · K8s 11个核心概念系统学习', link: '/daily/2026-06-17' },
             { text: '2026-06-01 · cbc -p slash 命令真值 & v0.3.1 方案 E', link: '/daily/2026-06-01' },
