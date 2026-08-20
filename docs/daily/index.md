@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-08-20](/daily/2026-08-20) —— Dragonfly P2P 镜像加速：架构、dfdaemon 双通道、bran-gr2 验证 SOP
 - [2026-08-13](/daily/2026-08-13) —— GraphRAG Leiden 社区检测算法：local move / refinement / aggregation 三阶段
 - [2026-08-08](/daily/2026-08-08) —— Vector RAG 核心原理解析：Embedding、余弦相似度、归一化优化、GraphRAG vs Vector RAG
 - [2026-06-17](/daily/2026-06-17) —— K8s 11 个核心概念系统学习：架构、Pod、Deployment、Service、Volume、API、Label/Selector、Namespace

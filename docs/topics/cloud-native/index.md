@@ -4,6 +4,7 @@
 
 ## 学习模块
 
+- [Dragonfly 镜像加速](./dragonfly) — P2P 分发架构、dfdaemon 双通道、P2P 验证 SOP、TCE 实战坑
 - [概述与发展简史](./overview) — 什么是云原生、解决什么问题、发展历史
 - [CNCF 全景图](./landscape) — 云原生生态全景图解读与重点项目
 - [容器技术](./container) — Docker、containerd、镜像构建（待补充）

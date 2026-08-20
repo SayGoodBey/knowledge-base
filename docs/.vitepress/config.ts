@@ -29,6 +29,7 @@ export default withMermaid(defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-08-20 · Dragonfly P2P 镜像加速实战', link: '/daily/2026-08-20' },
             { text: '2026-08-13 · GraphRAG Leiden 社区检测算法', link: '/daily/2026-08-13' },
             { text: '2026-08-08 · Vector RAG 原理', link: '/daily/2026-08-08' },
             { text: '2026-06-17 · K8s 11个核心概念系统学习', link: '/daily/2026-06-17' },
@@ -109,6 +110,7 @@ export default withMermaid(defineConfig({
           text: '☁️ 云原生学习',
           items: [
             { text: '概览', link: '/topics/cloud-native/' },
+            { text: 'Dragonfly 镜像加速', link: '/topics/cloud-native/dragonfly' },
             { text: '概述与发展简史', link: '/topics/cloud-native/overview' },
             { text: 'CNCF 全景图', link: '/topics/cloud-native/landscape' },
             { text: '容器技术', link: '/topics/cloud-native/container' },
