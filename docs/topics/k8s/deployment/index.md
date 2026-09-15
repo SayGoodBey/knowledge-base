@@ -76,3 +76,40 @@ flowchart LR
 - 新 ReplicaSet 逐步扩容，旧 ReplicaSet 逐步缩容
 - 中间时段新旧 Pod 共存，服务不中断
 - 出问题 → `kubectl rollout undo` 一键回滚（旧 ReplicaSet 还在！）
+
+---
+
+## StatefulSet 滚动更新死锁 <2026-09-15>
+
+**场景**：给 StatefulSet 的 pod 模板加了 toleration 后，pending 的 pod 依然没生效新模板，调度还是报同样的错。
+
+**现象**：Deployment 加 toleration 后 pod 自动重建生效；StatefulSet 加同样的 toleration 却没用。
+
+**原理（死锁）**：StatefulSet 滚动更新**只替换 Running + Ready 的 pod**。一个卡在 Pending 的 pod（不 Ready）会被控制器判定为「不能动」，于是永远不套用新模板：
+
+```text
+pod 因缺容忍 → Pending → 不 Ready
+        ↓
+StatefulSet 看它不 Ready → 拒绝滚动更新 → 永不套用新模板
+        ↓
+新模板里的容忍永远不生效 → pod 永远 Pending
+```
+
+**诊断信号**：
+
+```bash
+kubectl get statefulset <sts> -n <ns> -o yaml
+# 看 status.currentRevision != status.updateRevision，且 currentReplicas > 0
+```
+
+`currentRevision` = 旧模板（无容忍），`updateRevision` = 新模板（有容忍），说明有 pod 卡在旧 revision。
+
+**解法**：手动删 pending pod，强制用新 revision 重建：
+
+```bash
+kubectl delete pod <sts>-0 -n <ns>
+```
+
+Deployment 会自动重建 pending pod，StatefulSet 不会——这是两者关键差异。
+
+**额外坑**：StatefulSet 的 `serviceName` 是必填项，必须指向 `clusterIP: None` 的 Headless Service，否则 pod 拿不到稳定 hostname/DNS 身份（固定 IP 依赖它）。空 `serviceName: ""` 不挡调度，但会破坏固定身份。

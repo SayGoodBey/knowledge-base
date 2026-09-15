@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-09-15](/daily/2026-09-15) —— TCE Pod 调度失败排障：ENI-IP / ipset / Taint-Toleration / StatefulSet 死锁
 - [2026-08-20](/daily/2026-08-20) —— Dragonfly P2P 镜像加速：架构、dfdaemon 双通道、bran-gr2 验证 SOP
 - [2026-08-13](/daily/2026-08-13) —— GraphRAG Leiden 社区检测算法：local move / refinement / aggregation 三阶段
 - [2026-08-08](/daily/2026-08-08) —— Vector RAG 核心原理解析：Embedding、余弦相似度、归一化优化、GraphRAG vs Vector RAG

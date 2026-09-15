@@ -29,6 +29,7 @@ export default withMermaid(defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-09-15 · TCE Pod 调度失败排障（ENI-IP / ipset）', link: '/daily/2026-09-15' },
             { text: '2026-08-20 · Dragonfly P2P 镜像加速实战', link: '/daily/2026-08-20' },
             { text: '2026-08-13 · GraphRAG Leiden 社区检测算法', link: '/daily/2026-08-13' },
             { text: '2026-08-08 · Vector RAG 原理', link: '/daily/2026-08-08' },
