@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-09-22](/daily/2026-09-22) —— npm workspaces 下 esbuild 双版本 postinstall 冲突：四层根因串联 + overrides 正确姿势
 - [2026-09-15](/daily/2026-09-15) —— TCE Pod 调度失败排障：ENI-IP / ipset / Taint-Toleration / StatefulSet 死锁
 - [2026-08-20](/daily/2026-08-20) —— Dragonfly P2P 镜像加速：架构、dfdaemon 双通道、bran-gr2 验证 SOP
 - [2026-08-13](/daily/2026-08-13) —— GraphRAG Leiden 社区检测算法：local move / refinement / aggregation 三阶段
