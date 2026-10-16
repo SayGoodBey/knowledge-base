@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-10-16](/daily/2026-10-16) —— kubeadm 部署 K8s 与网络底层：三种 IP / Service 端口 / CNI / 虚拟网卡 cni0·flannel.1·veth
 - [2026-09-22](/daily/2026-09-22) —— npm workspaces 下 esbuild 双版本 postinstall 冲突：四层根因串联 + overrides 正确姿势
 - [2026-09-15](/daily/2026-09-15) —— TCE Pod 调度失败排障：ENI-IP / ipset / Taint-Toleration / StatefulSet 死锁
 - [2026-08-20](/daily/2026-08-20) —— Dragonfly P2P 镜像加速：架构、dfdaemon 双通道、bran-gr2 验证 SOP

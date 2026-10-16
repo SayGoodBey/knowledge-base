@@ -3,12 +3,14 @@
 ## 分类
 
 - [架构](/topics/k8s/architecture/) - Control Plane / Master / etcd / Scheduler / Controller
+- [安装部署](/topics/k8s/install/) - kubeadm 从零部署单节点集群与踩坑
 - [API 基础](/topics/k8s/api/) - API 设计 / Label & Selector / Namespace
 - [Node](/topics/k8s/node/) - 节点管理与调度
 - [Deployment](/topics/k8s/deployment/) - 部署与滚动更新
 - [Pod](/topics/k8s/pod/) - Pod 生命周期与配置
 - [PV/PVC](/topics/k8s/pv-pvc/) - 持久化存储
 - [Service](/topics/k8s/service/) - 服务发现与负载均衡
+- [网络](/topics/k8s/network/) - 三种 IP / Service 端口 / CNI / 虚拟网卡
 - [GPU 工作负载](/topics/k8s/gpu/) - GPU device plugin、qGPU 切片、TCE 排障
 
 ## 最近更新

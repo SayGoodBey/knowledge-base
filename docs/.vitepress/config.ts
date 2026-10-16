@@ -29,6 +29,7 @@ export default withMermaid(defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-10-16 · kubeadm 部署 K8s 与网络底层（三种 IP / CNI / 虚拟网卡）', link: '/daily/2026-10-16' },
             { text: '2026-09-22 · npm workspaces esbuild 双版本 postinstall 冲突', link: '/daily/2026-09-22' },
             { text: '2026-09-15 · TCE Pod 调度失败排障（ENI-IP / ipset）', link: '/daily/2026-09-15' },
             { text: '2026-08-20 · Dragonfly P2P 镜像加速实战', link: '/daily/2026-08-20' },
@@ -96,12 +97,14 @@ export default withMermaid(defineConfig({
           items: [
             { text: '概览', link: '/topics/k8s/' },
             { text: '架构', link: '/topics/k8s/architecture/' },
+            { text: '安装部署', link: '/topics/k8s/install/' },
             { text: 'API 基础', link: '/topics/k8s/api/' },
             { text: 'Node', link: '/topics/k8s/node/' },
             { text: 'Deployment', link: '/topics/k8s/deployment/' },
             { text: 'Pod', link: '/topics/k8s/pod/' },
             { text: 'PV/PVC', link: '/topics/k8s/pv-pvc/' },
             { text: 'Service', link: '/topics/k8s/service/' },
+            { text: '网络', link: '/topics/k8s/network/' },
             { text: 'GPU 工作负载', link: '/topics/k8s/gpu/' },
           ]
         }
