@@ -8,6 +8,7 @@
 - [概述与发展简史](./overview) — 什么是云原生、解决什么问题、发展历史
 - [CNCF 全景图](./landscape) — 云原生生态全景图解读与重点项目
 - [容器技术](./container) — Docker、containerd、镜像构建（待补充）
+- [Kubernetes 核心概念](./k8s-core) — 架构、核心资源对象、API 结构、三大核心能力
 - [Kubernetes 进阶](./k8s-advanced) — 调度、网络、存储深入（待补充）
 - [服务网格](./service-mesh) — Istio、Envoy（待补充）
 - [可观测性](./observability) — Prometheus、Grafana、OpenTelemetry（待补充）

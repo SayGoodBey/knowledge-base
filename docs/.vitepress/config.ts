@@ -29,6 +29,7 @@ export default withMermaid(defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-10-19 · 云原生公开课「Kubernetes 核心概念」', link: '/daily/2026-10-19' },
             { text: '2026-10-16 · kubeadm 部署 K8s 与网络底层（三种 IP / CNI / 虚拟网卡）', link: '/daily/2026-10-16' },
             { text: '2026-09-22 · npm workspaces esbuild 双版本 postinstall 冲突', link: '/daily/2026-09-22' },
             { text: '2026-09-15 · TCE Pod 调度失败排障（ENI-IP / ipset）', link: '/daily/2026-09-15' },

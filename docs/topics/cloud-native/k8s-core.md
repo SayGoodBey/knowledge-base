@@ -106,6 +106,8 @@ spec:                 # 期望状态（具体内容因 kind 而异）
 
 **GVK 模型**: Group + Version + Kind → 唯一确定一种资源类型
 
+> 💡 读取资源时会多出一个 `status` 字段（当前状态：Pending / Running / Terminated），由系统回写，用户只写 `spec`。
+
 ---
 
 ## Service 端口对应关系 <2026-05-19>
@@ -147,3 +149,123 @@ spec:
 ```
 
 > 💡 `targetPort` 和 `containerPort` 通常一致；`port` 可以不同（对外统一暴露 80/443）。
+
+---
+
+## 本讲三大核心能力 <2026-10-19>
+
+> 来源：CNCF × 阿里云《云原生技术公开课》第 3 讲「Kubernetes 核心概念」（李响）文字版。
+
+K8s = **工业级的容器编排平台**，负责应用的部署、弹性与管理，全部基于容器。单词来自希腊语「舵手 / 飞行员」；`k8s` 是把 `ubernete` 这 8 个字母换成 `8`。取「舵手」是双关——container 的另一含义是「集装箱」，K8s 要当那艘运集装箱的船。
+
+**调度（Scheduling）**
+
+```mermaid
+flowchart LR
+    U["提交容器<br/>requests: 1 CPU / 2Gi"] --> S["Scheduler<br/>按规格找空闲节点"]
+    S -->|placement| N2["Node-2<br/>最空闲 → 放下"]
+    N1["Node-1 已满"] -.-> S
+    N3["Node-3 已满"] -.-> S
+```
+
+**自动修复（Self-healing）**：节点健康检查持续监控宿主机，发现宿主机 / OS 故障后，把该节点上的容器迁到健康节点。
+
+```mermaid
+flowchart LR
+    subgraph Bad["故障节点"]
+        B1["容器 A"]
+        B2["容器 B"]
+    end
+    HC["节点健康检查"] -->|持续监控| Bad
+    HC -->|发现故障| M["迁移"]
+    M --> Good["健康节点<br/>容器 A / B 重新拉起"]
+```
+
+**水平伸缩**：业务负载检查发现 CPU 利用率过高 / 响应时间过长 → 扩容，再用负载均衡把流量摊到多份。
+
+```mermaid
+flowchart LR
+    T["负载检查<br/>CPU 高 / RT 长"] --> S1["Pod × 1（过载）"]
+    T -->|扩容| S2["Pod × 3"]
+    S2 --> LB["负载均衡<br/>每份承担 1/3"]
+```
+
+---
+
+## 架构补充：组件的部署形态 <2026-10-19>
+
+Master 四组件（API Server / Controller / Scheduler / etcd）的部署形态不同：
+
+| 组件 | 部署形态 | 高可用方式 |
+|------|----------|-----------|
+| API Server | 无状态，**可水平扩展** | 多副本 + 前面挂 LB |
+| Controller | **只有一个 active** | 多副本热备，抢 leader |
+| Scheduler | **只有一个 active** | 多副本热备，抢 leader |
+| etcd | 分布式 KV | Raft 多数派，撑起整个 Master 的高可用 |
+
+二层 + server-client 架构：**User（UI / CLI）只连 Master**，Node 不与用户直连，所有指令由 Master 下发。
+
+```mermaid
+graph TB
+    U["User / UI / kubectl"] --> M["Master<br/>API Server · Controller · Scheduler · etcd"]
+    M --> N1["Node-1"]
+    M --> N2["Node-2"]
+    M --> N3["Node-3"]
+```
+
+Node 侧边界：K8s **自己不做网络和存储**，靠 **Storage Plugin** / **Network Plugin**（CSI / CNI）落地；Service 那层组网由 **kube-proxy** 借 iptables 完成。
+
+---
+
+## 一次 Pod 调度执行的完整链路 <2026-10-19>
+
+```mermaid
+sequenceDiagram
+    participant U as User/CLI
+    participant API as API Server
+    participant E as etcd
+    participant S as Scheduler
+    participant K as kubelet
+    participant R as Runtime/Plugin
+
+    U->>API: 提交 Pod
+    API->>E: 写入 Pod 元信息
+    E-->>S: watch 到「有待调度 Pod」
+    S->>S: 调度决策（规格 + 节点内存/状态）
+    S->>API: report 目标节点
+    API->>E: 回写结果
+    API->>K: 通知目标节点执行
+    K->>R: Container Runtime 起容器<br/>Storage / Network Plugin 配存储网络
+```
+
+和 [K8s 架构](/topics/k8s/architecture/) 里的「Pod 创建全链路」是同一套 Watch 总线，只是分步拆得更细。
+
+---
+
+## Label / Selector 速记 <2026-10-19>
+
+- label 是 **KeyValuePair**（`color=red`、`size=big`），写在 `metadata` 里
+- selector 语义 ≈ SQL 的 `where`：3 个 Pod 里 `color=red` 只命中 2 个，黄色那个落选
+- Deployment「一组 Pod」、Service「一组 Pod」，这些「一组」全都用 label selector 表达——这是 K8s 描述资源集合的默认方式
+
+---
+
+## 动手 Demo：minikube + nginx <2026-10-19>
+
+环境三件套：VirtualBox → minikube（用阿里云版，Google 依赖换成了国内镜像）→ `minikube start --vm-driver virtualbox`
+
+```bash
+kubectl apply -f https://k8s.io/examples/application/deployment.yaml          # 建 2 副本 nginx:1.7.9
+kubectl apply -f https://k8s.io/examples/application/deployment-update.yaml    # 升级 image → 1.8
+kubectl apply -f https://k8s.io/examples/application/deployment-scale.yaml     # replicas 2 → 4
+kubectl delete deployment nginx-deployment                                     # 清理回干净状态
+```
+
+观察手段：
+
+| 命令 | 看什么 |
+|------|--------|
+| `kubectl get deployment -w` | replicas / up-to-date 数字滚动变化 |
+| `kubectl describe deployment nginx-deployment` | selector、image 版本、deployment-controller 的动作 |
+
+要点：**同一个对象换份 YAML 再 apply 就完成升级 / 扩容**，不用手工删旧建新——控制器按 spec 收敛。
