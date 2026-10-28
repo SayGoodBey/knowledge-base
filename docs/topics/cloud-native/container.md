@@ -207,13 +207,13 @@ docker run -d --restart always busybox top
 > 来源：CNCF × 阿里云《云原生技术公开课》「Pod 与容器设计模式」。
 > 这一节把前面的单容器知识接到编排层——「一个 Pod 里为什么会有多个容器、它们凭什么能共享」。Pod 自身的调度与生命周期见 [K8s · Pod](/topics/cloud-native/k8s/pod/)。
 
-### 为什么要有 Pod：容器是单进程模型
+### 容器是单进程模型，所以才需要 Pod
 
-容器的本质是「只有一个 PID 1 的进程」（见本页「容器生命周期」一节），所以它当不了虚拟机里的 `systemd`——没法在一个容器里优雅地管理多个有依赖关系的进程（谁拉起谁、父进程挂了怎么办、僵尸进程谁回收）。
-
-但真实应用里确实存在**必须部署在一起**的「进程组」：WAR 包 + Tomcat、应用 + 日志采集、应用 + 本地代理。K8s 的解法是把进程组这一层抽出来：
+容器的本质是「只有一个 PID 1 的进程」（见本页「容器生命周期」一节），所以它当不了虚拟机里的 `systemd`——没法在一个容器里优雅地管理多个有依赖关系的进程。而真实应用往往是**必须待在一起的进程组**：WAR 包 + Tomcat、应用 + 日志采集、应用 + 本地代理。K8s 的解法是把「进程组」抽成一层对象：
 
 > **Pod = 进程组，容器 = 进程**。调度、资源、网络身份、生命周期全都按 Pod 这个整体算，容器只是里面的一个进程。
+
+> 完整论证（操作系统类比、单容器多进程的困境、**成组调度问题**、亲密关系 vs 非亲密关系）见 [K8s · Pod · 为什么需要 Pod](/topics/cloud-native/k8s/pod/)。本页只讲「凭什么能共享」这件实现层的事。
 
 ### Infra Container（pause 容器）：共享关系的锚点
 
@@ -257,6 +257,14 @@ flowchart TB
 **Volume 的共享实现**：Volume 声明在 `spec.volumes`（Pod 级，生命周期属 Pod），kubelet 在宿主机准备目录 `/var/lib/kubelet/pods/<pod-uid>/volumes/...`，再 **bind mount** 进各容器声明的 `mountPath`。所以多个容器挂同一个 volume 就是在读写同一份宿主机目录——这正是 init 容器传递产物、sidecar 读日志的物理基础。Volume 类型详见 [PV/PVC](/topics/cloud-native/k8s/pv-pvc/)。
 
 ### Init Container：顺序执行、跑完就退
+
+**经典案例：WAR 包 + Tomcat 怎么部署**。这个问题的三次演进，正好推出了 init container 存在的理由：
+
+| 方案 | 做法 | 问题 |
+|------|------|------|
+| ① 打成一个镜像 | WAR 包和 Tomcat 一起 `docker build` | 改 WAR 要重做镜像、改 Tomcat 也要重做镜像；两者版本锁死，无法独立发布、无法复用 |
+| ② 宿主机挂载 | 只打 Tomcat 镜像，WAR 包用 Volume 从宿主机挂进去 | 需要分布式存储保证每台机器都有这份 WAR；还得单独维护「宿主机上的 WAR 包」这套流程，等于把运维负担挪到集群外 |
+| ③ **Init Container** | WAR 包也做成镜像，init 容器把 WAR `cp` 到 emptyDir，Tomcat 容器从同一个 Volume 读 | 两个镜像各自独立发布、独立复用，没有外部存储依赖 ✓ |
 
 `initContainers` 列表里的容器**按书写顺序串行执行**，每个都必须 `exit 0`，全部成功后才启动 `containers`；而业务容器之间是并行启动、**没有顺序保证**。所以「保证某件事发生在应用启动之前」只能靠 init 容器。
 
@@ -327,6 +335,18 @@ flowchart TB
 | **Adapter**（适配器） | 统一对外暴露格式 | 各类 exporter 把应用指标转成 Prometheus 格式 |
 | **Service Mesh 数据面** | 透明接管进出流量 | Istio `istio-proxy`：MutatingAdmissionWebhook 自动注入 + init 容器改 iptables 劫持流量 |
 
+**Sidecar 的五类常见落地**：
+
+| 场景 | 怎么做 |
+|------|--------|
+| **日志收集** | 主容器把日志写进共享 Volume，sidecar 读出来转发到日志服务 |
+| **Debug 应用** | 临时塞一个带全套工具（`curl` / `tcpdump` / `jmap`）的容器进 Pod，共享 namespace 直接排查——业务镜像可以保持精简，不必为了排障打包调试工具 |
+| **应用监控** | sidecar 在 `localhost` 上抓主容器的指标端点，转成 Prometheus 格式暴露出去 |
+| **代理容器（Proxy）** | 主容器只连 `localhost:port`，sidecar 负责服务发现、重试、负载均衡、连接外部集群——应用代码不用关心拓扑 |
+| **适配器容器（Adapter）** | 主容器暴露的是老格式 / 内部格式，sidecar 把它适配成外部统一规范，不改业务代码就完成对接 |
+
+> Debug 和 Proxy 这两类最能体现价值：**业务镜像不必为「可能用到」的能力买单**。调试工具、代理逻辑都是单独的镜像，谁需要谁挂上。
+
 **代价与注意点**：
 
 - 资源放大——每个 Pod 都多一份代理开销（Istio 这类 Mesh 的主要成本来源）
@@ -336,3 +356,5 @@ flowchart TB
 ### 一句话总结
 
 > **Pod = 共享 Network / IPC / UTS namespace + 共享 Volume 的一组容器**。pause 容器充当 namespace 的持有者、打破启动顺序依赖，kubelet + CRI + CNI + CSI 协同完成「隔离中的共享」——init container（顺序初始化）与 sidecar（协同增强）这两种设计模式才得以成立。
+
+容器设计模式是 Google Borg 大规模集群管理的最佳实践，也是 K8s 做复杂应用编排的基础依赖。所有模式的本质就两个词：**解耦**与**重用**。

@@ -8,6 +8,7 @@
 |----------|----------|
 | 容器是什么、镜像分层、Dockerfile、容器 vs VM、Namespace / Cgroups、containerd / runc 引擎架构 | [容器技术](./container) |
 | **pause（Infra）容器、Init 容器、Sidecar 设计模式、Pod 内共享实现** | [容器技术 · Pod 内的三类容器](./container) |
+| **为什么需要 Pod：操作系统类比、成组调度、亲密关系判断** | [K8s · Pod](./k8s/pod/) |
 | 云原生是什么、发展简史、架构标准、不可变基础设施、生态辨析 | [概述与发展简史](./overview) |
 | CNCF 生态有哪些项目、怎么选 | [CNCF 全景图](./landscape) |
 | K8s 架构、API、Pod、Deployment、Service、存储、网络、GPU | [Kubernetes](./k8s/) |
