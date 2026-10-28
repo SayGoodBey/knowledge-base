@@ -16,8 +16,7 @@ export default withMermaid(defineConfig({
           { text: '🎨 前端', link: '/topics/frontend/' },
           { text: '🚀 项目', link: '/topics/projects/' },
           { text: '🔧 DevOps', link: '/topics/devops/' },
-          { text: '☸️ K8s', link: '/topics/k8s/' },
-          { text: '☁️ 云原生', link: '/topics/cloud-native/' },
+          { text: '☁️ 云原生 / K8s', link: '/topics/cloud-native/' },
           { text: '🤖 AI', link: '/topics/ai/' },
         ]
       },
@@ -29,6 +28,7 @@ export default withMermaid(defineConfig({
           text: '📅 每日学习',
           items: [
             { text: '索引', link: '/daily/' },
+            { text: '2026-10-28 · Pod 与容器设计模式（pause/init/sidecar）+ 知识库消重', link: '/daily/2026-10-28' },
             { text: '2026-10-19 · 云原生公开课「Kubernetes 核心概念」', link: '/daily/2026-10-19' },
             { text: '2026-10-16 · kubeadm 部署 K8s 与网络底层（三种 IP / CNI / 虚拟网卡）', link: '/daily/2026-10-16' },
             { text: '2026-09-22 · npm workspaces esbuild 双版本 postinstall 冲突', link: '/daily/2026-09-22' },
@@ -92,39 +92,31 @@ export default withMermaid(defineConfig({
         }
       ],
 
-      '/topics/k8s/': [
+      '/topics/cloud-native/': [
+        {
+          text: '☁️ 云原生',
+          items: [
+            { text: '概览 · 按主题找', link: '/topics/cloud-native/' },
+            { text: '概述与发展简史', link: '/topics/cloud-native/overview' },
+            { text: 'CNCF 全景图', link: '/topics/cloud-native/landscape' },
+            { text: '容器技术（含 pause/init/sidecar）', link: '/topics/cloud-native/container' },
+            { text: 'Dragonfly 镜像加速', link: '/topics/cloud-native/dragonfly' },
+          ]
+        },
         {
           text: '☸️ Kubernetes',
           items: [
-            { text: '概览', link: '/topics/k8s/' },
-            { text: '架构', link: '/topics/k8s/architecture/' },
-            { text: '安装部署', link: '/topics/k8s/install/' },
-            { text: 'API 基础', link: '/topics/k8s/api/' },
-            { text: 'Node', link: '/topics/k8s/node/' },
-            { text: 'Deployment', link: '/topics/k8s/deployment/' },
-            { text: 'Pod', link: '/topics/k8s/pod/' },
-            { text: 'PV/PVC', link: '/topics/k8s/pv-pvc/' },
-            { text: 'Service', link: '/topics/k8s/service/' },
-            { text: '网络', link: '/topics/k8s/network/' },
-            { text: 'GPU 工作负载', link: '/topics/k8s/gpu/' },
-          ]
-        }
-      ],
-
-      '/topics/cloud-native/': [
-        {
-          text: '☁️ 云原生学习',
-          items: [
-            { text: '概览', link: '/topics/cloud-native/' },
-            { text: 'Dragonfly 镜像加速', link: '/topics/cloud-native/dragonfly' },
-            { text: '概述与发展简史', link: '/topics/cloud-native/overview' },
-            { text: 'CNCF 全景图', link: '/topics/cloud-native/landscape' },
-            { text: '容器技术', link: '/topics/cloud-native/container' },
-            { text: 'K8s 核心概念', link: '/topics/cloud-native/k8s-core' },
-            { text: 'K8s 进阶', link: '/topics/cloud-native/k8s-advanced' },
-            { text: '服务网格', link: '/topics/cloud-native/service-mesh' },
-            { text: '可观测性', link: '/topics/cloud-native/observability' },
-            { text: 'CI/CD 与 GitOps', link: '/topics/cloud-native/gitops' },
+            { text: '概览', link: '/topics/cloud-native/k8s/' },
+            { text: '架构', link: '/topics/cloud-native/k8s/architecture/' },
+            { text: '安装部署', link: '/topics/cloud-native/k8s/install/' },
+            { text: 'API 基础', link: '/topics/cloud-native/k8s/api/' },
+            { text: 'Node', link: '/topics/cloud-native/k8s/node/' },
+            { text: 'Deployment', link: '/topics/cloud-native/k8s/deployment/' },
+            { text: 'Pod', link: '/topics/cloud-native/k8s/pod/' },
+            { text: 'PV/PVC', link: '/topics/cloud-native/k8s/pv-pvc/' },
+            { text: 'Service', link: '/topics/cloud-native/k8s/service/' },
+            { text: '网络', link: '/topics/cloud-native/k8s/network/' },
+            { text: 'GPU 工作负载', link: '/topics/cloud-native/k8s/gpu/' },
           ]
         }
       ],

@@ -26,7 +26,7 @@ disown
 | `&` | 后台运行，不占 shell |
 | `disown` | 从 shell 作业表移除，shell 退出时不会尝试 kill |
 
-**管理脚本模板**：start/stop/status/logs/restart，配 PID 文件管理。完整示例见 [K8s / GPU 工作负载](/topics/k8s/gpu/) 第 10 节。
+**管理脚本模板**：start/stop/status/logs/restart，配 PID 文件管理。完整示例见 [K8s / GPU 工作负载](/topics/cloud-native/k8s/gpu/) 第 10 节。
 
 **更优方案：tmux**（支持断开后再接回）：
 

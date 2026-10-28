@@ -106,3 +106,68 @@ spec:                 # 规格定义（期望值）
   replicas: 3
   template: ...
 ```
+
+---
+
+## 三大核心能力：调度 / 自愈 / 水平伸缩 <2026-10-19>
+
+> 来源：CNCF × 阿里云《云原生技术公开课》第 3 讲「Kubernetes 核心概念」（李响）。
+
+K8s = **工业级容器编排平台**，负责应用的部署、弹性与管理，全部基于容器。名字来自希腊语「舵手 / 飞行员」，`k8s` 是把 `ubernete` 这 8 个字母换成 `8`；取「舵手」是双关——container 另一个含义是「集装箱」，K8s 就是运集装箱的那艘船。
+
+**调度（Scheduling）**：按容器声明的规格找一台放得下的空闲节点。
+
+```mermaid
+flowchart LR
+    U["提交容器<br/>requests: 1 CPU / 2Gi"] --> S["Scheduler<br/>按规格找空闲节点"]
+    S -->|placement| N2["Node-2<br/>最空闲 → 放下"]
+    N1["Node-1 已满"] -.-> S
+    N3["Node-3 已满"] -.-> S
+```
+
+**自动修复（Self-healing）**：节点健康检查持续监控宿主机，发现宿主机 / OS 故障后，把该节点上的容器迁到健康节点。
+
+```mermaid
+flowchart LR
+    subgraph Bad["故障节点"]
+        B1["容器 A"]
+        B2["容器 B"]
+    end
+    HC["节点健康检查"] -->|持续监控| Bad
+    HC -->|发现故障| M["迁移"]
+    M --> Good["健康节点<br/>容器 A / B 重新拉起"]
+```
+
+**水平伸缩**：负载检查发现 CPU 利用率过高 / 响应时间过长 → 扩容，再用负载均衡把流量摊到多份。
+
+```mermaid
+flowchart LR
+    T["负载检查<br/>CPU 高 / RT 长"] --> S1["Pod × 1（过载）"]
+    T -->|扩容| S2["Pod × 3"]
+    S2 --> LB["负载均衡<br/>每份承担 1/3"]
+```
+
+---
+
+## 组件的部署形态与高可用 <2026-10-19>
+
+Master 四组件的部署形态并不一样，这决定了它们各自的高可用方式：
+
+| 组件 | 部署形态 | 高可用方式 |
+|------|----------|-----------|
+| API Server | 无状态，**可水平扩展** | 多副本 + 前面挂 LB |
+| Controller | **只有一个 active** | 多副本热备，抢 leader |
+| Scheduler | **只有一个 active** | 多副本热备，抢 leader |
+| etcd | 分布式 KV | Raft 多数派，撑起整个 Master 的高可用 |
+
+二层 + server-client 架构：**User（UI / CLI）只连 Master**，Node 不与用户直连，所有指令由 Master 下发。
+
+```mermaid
+graph TB
+    U["User / UI / kubectl"] --> M["Master<br/>API Server · Controller · Scheduler · etcd"]
+    M --> N1["Node-1"]
+    M --> N2["Node-2"]
+    M --> N3["Node-3"]
+```
+
+Node 侧的能力边界：K8s **自己不做网络和存储**，靠 **Network Plugin（CNI）** 与 **Storage Plugin（CSI）** 落地；Service 那层组网由 **kube-proxy** 借 iptables / IPVS 完成。所以上面「Pod 创建全链路」最后一步 kubelet 调的不只是 Container Runtime，还包括这两类插件。

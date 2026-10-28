@@ -113,3 +113,25 @@ kubectl delete pod <sts>-0 -n <ns>
 Deployment 会自动重建 pending pod，StatefulSet 不会——这是两者关键差异。
 
 **额外坑**：StatefulSet 的 `serviceName` 是必填项，必须指向 `clusterIP: None` 的 Headless Service，否则 pod 拿不到稳定 hostname/DNS 身份（固定 IP 依赖它）。空 `serviceName: ""` 不挡调度，但会破坏固定身份。
+
+---
+
+## 动手 Demo：minikube 上跑完升级与扩容 <2026-10-19>
+
+环境三件套：VirtualBox → minikube（用阿里云版，Google 依赖换成了国内镜像）→ `minikube start --vm-driver virtualbox`
+
+```bash
+kubectl apply -f https://k8s.io/examples/application/deployment.yaml          # 建 2 副本 nginx:1.7.9
+kubectl apply -f https://k8s.io/examples/application/deployment-update.yaml    # 升级 image → 1.8
+kubectl apply -f https://k8s.io/examples/application/deployment-scale.yaml     # replicas 2 → 4
+kubectl delete deployment nginx-deployment                                     # 清理回干净状态
+```
+
+观察手段：
+
+| 命令 | 看什么 |
+|------|--------|
+| `kubectl get deployment -w` | replicas / up-to-date 数字滚动变化 |
+| `kubectl describe deployment nginx-deployment` | selector、image 版本、deployment-controller 的动作 |
+
+要点：**同一个对象换份 YAML 再 apply 就完成升级 / 扩容**，不用手工删旧建新——控制器按 spec 收敛。

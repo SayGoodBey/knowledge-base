@@ -4,6 +4,7 @@
 
 ## 最近记录
 
+- [2026-10-28](/daily/2026-10-28) —— Pod 与容器设计模式：pause / init / sidecar + 知识库「云原生 ⊃ K8s」合并消重
 - [2026-10-19](/daily/2026-10-19) —— 云原生公开课「Kubernetes 核心概念」：三大能力、组件部署形态、调度链路、minikube 实操
 - [2026-10-16](/daily/2026-10-16) —— kubeadm 部署 K8s 与网络底层：三种 IP / Service 端口 / CNI / 虚拟网卡 cni0·flannel.1·veth
 - [2026-09-22](/daily/2026-09-22) —— npm workspaces 下 esbuild 双版本 postinstall 冲突：四层根因串联 + overrides 正确姿势

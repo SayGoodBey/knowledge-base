@@ -1,6 +1,8 @@
 # Pod
 
-记录 Pod 生命周期、容器共享机制、Sidecar 模式等知识。
+记录 Pod 的定位、共享机制与调度原理。
+
+> 📌 **容器层面的知识统一放在一处**：pause（Infra）容器、Init 容器、Sidecar 四种设计模式、namespace / Volume 共享的实现原理，全部见 [容器技术 · Pod 内的三类容器](/topics/cloud-native/container)。本页只讲 Pod 这个对象本身。
 
 ## 知识点
 
@@ -31,7 +33,7 @@ flowchart TB
 
 3. **同生同死、一起调度**：调度器把 Pod 作为整体分配，不会被拆散到不同节点。重启时一起重建，不适合放独立服务。
 
-**常见 Sidecar 模式**：日志采集（Filebeat）、服务注册（Consul Agent）、代理转发（Envoy）
+**常见 Sidecar 模式**：日志采集（Filebeat）、服务注册（Consul Agent）、代理转发（Envoy）——详细的四种模式与代价见 [容器技术 · Sidecar](/topics/cloud-native/container)。
 
 ---
 

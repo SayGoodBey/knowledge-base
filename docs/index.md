@@ -28,10 +28,10 @@ features:
     title: DevOps 与工程化
     details: CI/CD、Git、代码质量、自动化脚本
     link: /topics/devops/
-  - icon: ☸️
-    title: Kubernetes
-    details: Node、Deployment、Pod、PV/PVC、Service、GPU 工作负载
-    link: /topics/k8s/
+  - icon: ☁️
+    title: 云原生 / Kubernetes
+    details: 容器与镜像、pause/init/sidecar、K8s 架构与资源对象、网络存储、GPU 工作负载、镜像加速
+    link: /topics/cloud-native/
   - icon: 🤖
     title: AI
     details: 工作流、MCP、Skill、Agent 等 AI 相关知识

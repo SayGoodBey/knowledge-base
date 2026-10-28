@@ -21,6 +21,10 @@
 | `metadata` | 元数据 | `name`, `labels`, `namespace` |
 | `spec` | 规格定义 | `containers`, `replicas` |
 
+**GVK 模型**：Group + Version + Kind → 唯一确定一种资源类型。`apiVersion: apps/v1` 就是 Group=`apps` + Version=`v1`，再配上 `kind: Deployment`。核心资源组（Pod / Service / ConfigMap 等）的 Group 为空，所以只写 `v1`。
+
+> 💡 **写进去只有 4 个字段，读出来会多一个 `status`**：`status` 是当前真实状态（Pending / Running / Terminated…），由系统回写，用户只负责写 `spec`。这就是声明式 API 的分工线。
+
 ---
 
 ## Label 与 Selector <2026-06-17>
@@ -46,6 +50,12 @@ flowchart LR
 - `kubectl get pods -l env=prod` 筛选 prod 环境的所有 Pod
 
 **常用 Label**：`app`, `tier`, `env`, `version`, `component`
+
+**速记**：
+
+- label 是 **KeyValuePair**（`color=red`、`size=big`），写在 `metadata` 里
+- selector 语义 ≈ SQL 的 `where`：上图 3 个 Pod 里 `color=red` 只命中 2 个，黄色那个落选
+- Deployment「一组 Pod」、Service「一组 Pod」、HPA「一组 Pod」——这些「一组」全部用 label selector 表达，这是 K8s 描述资源集合的**默认方式**，没有硬编码的名字引用
 
 ---
 
