@@ -105,3 +105,63 @@ npm ls esbuild
 ```
 
 ---
+
+## tce dev 热更失效：fsevents@1 段错误 + CSP 拦截 HMR 长连接 <2026-11-19>
+
+**场景**: TCS 项目 `tce dev`（tce-cli 1.1.154，webpack 4）在 arm64 Mac + Node 18 上，改代码页面不更新，必须重启 dev server。控制台还有一条 `hot update failed for module ...alias/react-hot-loader/root.js` 干扰判断。
+
+**热更链路**（任何一环断了都表现为"改了不生效"）:
+
+```mermaid
+flowchart LR
+    A[保存文件] --> B[watchpack / chokidar 监听]
+    B --> C[webpack 增量编译]
+    C --> D[webpack-hot-middleware 通过 __webpack_hmr SSE 推送 building/built + hash]
+    D --> E[浏览器拉取 *.hot-update.json/js]
+    E --> F[react-hot-loader 替换模块]
+```
+
+**根因一：服务端没检测到文件变更**
+- 现象：监听 `__webpack_hmr`，touch 业务文件后 5 分钟内只有 `sync`、没有 `building`；dev server 进程 CPU 0%。
+- 定位：单独用 tce-cli 自带的 `watchpack` 测同一文件 → 无事件；直接 `require('fsevents')` 起监听 → **exit 139（SIGSEGV 段错误）**；chokidar 关闭 `useFsEvents` → 正常收到 change。
+- 原因：tce-cli 依赖链 `watchpack@1.6 → chokidar@2.1.8 → fsevents@1.2.13`，fsevents 1.x 是停更的老原生扩展，在新 Node / macOS 上崩溃，进程不退出但监听失效。
+- 修复：改名禁用，chokidar 2 找不到 fsevents 会自动回退到 Node 的 `fs.watch`：
+
+```bash
+cd ~/.nvm/versions/node/<版本>/lib/node_modules/@tencent/tce-cli/node_modules
+mv fsevents fsevents.disabled-segfault   # 恢复：改回 fsevents
+```
+
+注意：改的是全局 tce-cli，项目 git 无变更；重装/升级 tce-cli 或切换 nvm 版本需重新处理。
+
+**根因二：浏览器收不到推送**
+- `__webpack_hmr` 是 webpack-hot-middleware 的 **SSE 长连接**（`Accept: text/event-stream`），用来通知浏览器"有新编译结果"。
+- 现象：Network 里一串红色 `http://wds.tea.local/__webpack_hmr`，显示 "Provisional headers are shown"（请求没真正发出）；而经 whistle 用 curl 请求同一地址能正常收到 `data: {...}`。
+- 原因：控制台页面带 CSP，EventSource 受 `connect-src` 管控，`wds.tea.local` 不在白名单；`<script>` 走 `script-src`，所以 JS 能加载、唯独 HMR 连接被拦。
+- 修复（whistle 规则）：
+
+```
+o.tcs2351-2-new.fsphere.cn disable://csp
+```
+
+**干扰项**: `hot update failed for module "...alias/react-hot-loader/root.js"` 是 react-hot-loader 的 100ms 兜底计时器误报（tce-cli 用 alias 包了一层 `root`，`module.parent` 指向 alias 文件；根组件异步挂载超过 100ms 就打印），与热更是否成功无关。
+
+**fsevents vs Node fs.watch**:
+
+| | fsevents（macOS FSEvents） | Node `fs.watch`（chokidar 回退） |
+|---|---|---|
+| 原理 | 整棵目录树一个系统事件流，内核合并后推送 | chokidar 对每个目录/文件分别 `fs.watch` |
+| 句柄 | 很少 | 每个被监听项一个 fd |
+| 稳定性 | 依赖原生扩展，1.x 已崩 | Node 内置，稳定 |
+
+FSEvents 理论更省资源，但 Node 在 macOS 上监听目录底层本来也是 FSEvents，单文件才用 kqueue，差距主要在 fd 数。遇到 `EMFILE` 或 CPU 高再加 `watchOptions: { ignored: /node_modules/ }`。
+
+**排查技巧**:
+
+```bash
+# 1. 看服务端有没有在推送（不刷新页面也能判断是否触发编译）
+curl -sN -H 'Accept: text/event-stream' http://127.0.0.1:<port>/__webpack_hmr
+# 2. 另开终端 touch 一个源文件，观察是否出现 "action":"building"
+```
+
+---
